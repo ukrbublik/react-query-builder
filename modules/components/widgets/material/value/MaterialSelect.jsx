@@ -6,7 +6,7 @@ import FormControl from "@material-ui/core/FormControl";
 import omit from "lodash/omit";
 
 export default ({listValues, value, setValue, allowCustomValues, readonly, placeholder, customProps}) => {
-  const renderOptions = () => 
+  const renderOptions = () =>
     mapListValues(listValues, ({title, value}) => {
       return <MenuItem key={value} value={value}>{title}</MenuItem>;
     });
@@ -17,13 +17,13 @@ export default ({listValues, value, setValue, allowCustomValues, readonly, place
     setValue(e.target.value);
   };
 
+  const hasValue = value != null;
+
   const renderValue = (selectedValue) => {
-    if (!readonly && !selectedValue)
+    if (!readonly && !hasValue)
       return placeholder;
     return mapListValues(listValues, ({title, value}) => (value === selectedValue ? title : null)).filter(v => v !== null).shift();
   };
-  
-  const hasValue = value != null;
 
   return (
     <FormControl>
