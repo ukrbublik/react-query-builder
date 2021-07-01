@@ -124,7 +124,8 @@ export default class DemoQueryBuilder extends Component<{}, DemoQueryBuilderStat
       </div>
     )
     
-    onChange = (immutableTree: ImmutableTree, config: Config) => {
+    onChange = (immutableTree: ImmutableTree, config: Config, changedField?: string) => {
+      console.log(changedField)
       this.immutableTree = immutableTree;
       this.config = config;
       this.updateResult();
