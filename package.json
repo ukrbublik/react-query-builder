@@ -167,7 +167,7 @@
     "sass": "^1.35.0",
     "sass-loader": "^12.1.0",
     "sinon": "^11.1.1",
-    "style-loader": "^2.0.0",
+    "style-loader": "^3.0.0",
     "ts-loader": "^9.2.3",
     "typescript": "^4.3.2",
     "url-loader": "^4.1.1",
