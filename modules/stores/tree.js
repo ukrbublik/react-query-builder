@@ -406,6 +406,7 @@ const setOperator = (state, path, newOperator, config) => {
  */
 const setValue = (state, path, delta, value, valueType, config, __isInternal) => {
   const {fieldSeparator, showErrorMessage} = config.settings;
+  let isInternalValueChange;
   const valueSrc = state.getIn(expandTreePath(path, "properties", "valueSrc", delta + "")) || null;
   if (valueSrc === "field" && Array.isArray(value))
     value = value.join(fieldSeparator);
@@ -453,7 +454,7 @@ const setValue = (state, path, delta, value, valueType, config, __isInternal) =>
     } else {
       state = state.setIn(expandTreePath(path, "properties", "value", delta + ""), value);
       state = state.setIn(expandTreePath(path, "properties", "valueType", delta + ""), calculatedValueType);
-      state.__isInternalValueChange = __isInternal && !isLastEmpty && !isLastError;
+      isInternalValueChange = __isInternal && !isLastEmpty && !isLastError;
     }
   }
   if (showErrorMessage) {
@@ -461,10 +462,10 @@ const setValue = (state, path, delta, value, valueType, config, __isInternal) =>
   }
   if (__isInternal && (isValid && isLastError || !isValid && !isLastError)) {
     state = state.setIn(expandTreePath(path, "properties", "valueError", delta), validateError);
-    state.__isInternalValueChange = false;
+    isInternalValueChange = false;
   }
-
-  return state;
+  
+  return {tree: state, isInternalValueChange};
 };
 
 /**
@@ -547,6 +548,11 @@ const calculateValueType = (value, valueSrc, config) => {
   return calculatedValueType;
 };
 
+const getField = (state, path) => {
+  const field = state.getIn(expandTreePath(path, "properties", "field")) || null;
+  return field;
+};
+
 const emptyDrag = {
   dragging: {
     id: null,
@@ -569,71 +575,116 @@ const emptyDrag = {
 export default (config) => {
   const emptyTree = defaultRoot(config);
   const emptyState = Object.assign({}, {tree: emptyTree}, emptyDrag);
-  const unset = {__isInternalValueChange: undefined};
     
   return (state = emptyState, action) => {
+    const unset = {__isInternalValueChange: undefined, __lastField: undefined};
+    let set = {};
+
     switch (action.type) {
-    case constants.SET_TREE:
-      return Object.assign({}, state, {...unset}, {tree: action.tree});
+      case constants.SET_TREE: {
+        set.tree = action.tree;
+        break;
+      }
 
-    case constants.ADD_NEW_GROUP:
-      return Object.assign({}, state, {...unset}, {tree: addNewGroup(state.tree, action.path, action.properties, action.config)});
+      case constants.ADD_NEW_GROUP: {
+        set.tree = addNewGroup(state.tree, action.path, action.properties, action.config);
+        break;
+      }
 
-    case constants.ADD_GROUP:
-      return Object.assign({}, state, {...unset}, {tree: addItem(state.tree, action.path, "group", action.id, action.properties, action.config)});
+      case constants.ADD_GROUP: {
+        set.tree = addItem(state.tree, action.path, "group", action.id, action.properties, action.config);
+        break;
+      }
 
-    case constants.REMOVE_GROUP:
-      return Object.assign({}, state, {...unset}, {tree: removeGroup(state.tree, action.path, action.config)});
+      case constants.REMOVE_GROUP: {
+        set.tree = removeGroup(state.tree, action.path, action.config);
+        set.__lastField = getField(state.tree, action.path);
+        break;
+      }
 
-    case constants.ADD_RULE:
-      return Object.assign({}, state, {...unset}, {tree: addItem(state.tree, action.path, "rule", action.id, action.properties, action.config)});
+      case constants.ADD_RULE: {
+        set.tree = addItem(state.tree, action.path, "rule", action.id, action.properties, action.config);
+        break;
+      }
 
-    case constants.REMOVE_RULE:
-      return Object.assign({}, state, {...unset}, {tree: removeRule(state.tree, action.path, action.config)});
+      case constants.REMOVE_RULE: {
+        set.tree = removeRule(state.tree, action.path, action.config);
+        set.__lastField = getField(state.tree, action.path);
+        break;
+      }
 
-    case constants.SET_CONJUNCTION:
-      return Object.assign({}, state, {...unset}, {tree: setConjunction(state.tree, action.path, action.conjunction)});
+      case constants.SET_CONJUNCTION: {
+        set.tree = setConjunction(state.tree, action.path, action.conjunction);
+        break;
+      }
 
-    case constants.SET_NOT:
-      return Object.assign({}, state, {...unset}, {tree: setNot(state.tree, action.path, action.not)});
+      case constants.SET_NOT: {
+        set.tree = setNot(state.tree, action.path, action.not);
+        break;
+      }
 
-    case constants.SET_FIELD:
-      return Object.assign({}, state, {...unset}, {tree: setField(state.tree, action.path, action.field, action.config)});
+      case constants.SET_FIELD: {
+        set.tree = setField(state.tree, action.path, action.field, action.config);
+        set.__lastField = action.field;
+        break;
+      }
 
-    case constants.SET_OPERATOR:
-      return Object.assign({}, state, {...unset}, {tree: setOperator(state.tree, action.path, action.operator, action.config)});
+      case constants.SET_OPERATOR: {
+        set.tree = setOperator(state.tree, action.path, action.operator, action.config);
+        set.__lastField = getField(state.tree, action.path);
+        break;
+      }
 
-    case constants.SET_VALUE: {
-      let set = {};
-      const tree = setValue(state.tree, action.path, action.delta, action.value, action.valueType, action.config, action.__isInternal);
-      if (tree.__isInternalValueChange)
-        set.__isInternalValueChange = true;
-      return Object.assign({}, state, {...unset, ...set}, {tree});
+      case constants.SET_VALUE: {
+        const {tree, isInternalValueChange} = setValue(
+          state.tree, action.path, action.delta, action.value, action.valueType, action.config, action.__isInternal
+        );
+        set.__isInternalValueChange = isInternalValueChange;
+        set.__lastField = getField(state.tree, action.path);
+        set.tree = tree;
+        break;
+      }
+
+      case constants.SET_VALUE_SRC: {
+        set.tree = setValueSrc(state.tree, action.path, action.delta, action.srcKey, action.config);
+        set.__lastField = getField(state.tree, action.path);
+        break;
+      }
+
+      case constants.SET_OPERATOR_OPTION: {
+        set.tree = setOperatorOption(state.tree, action.path, action.name, action.value);
+        set.__lastField = getField(state.tree, action.path);
+        break;
+      }
+
+      case constants.MOVE_ITEM: {
+        set.tree = moveItem(state.tree, action.fromPath, action.toPath, action.placement, action.config);
+        break;
+      }
+
+      case constants.SET_DRAG_START: {
+        set.dragStart = action.dragStart;
+        set.dragging = action.dragging;
+        set.mousePos = action.mousePos;
+        break;
+      }
+
+      case constants.SET_DRAG_PROGRESS: {
+        set.mousePos = action.mousePos;
+        set.dragging = action.dragging;
+        break;
+      }
+
+      case constants.SET_DRAG_END: {
+        set.tree = checkEmptyGroups(state.tree, config);
+        set = { ...set, ...emptyDrag };
+        break;
+      }
+
+      default: {}
     }
-
-    case constants.SET_VALUE_SRC:
-      return Object.assign({}, state, {...unset}, {tree: setValueSrc(state.tree, action.path, action.delta, action.srcKey, action.config)});
-
-    case constants.SET_OPERATOR_OPTION:
-      return Object.assign({}, state, {...unset}, {tree: setOperatorOption(state.tree, action.path, action.name, action.value)});
-
-    case constants.MOVE_ITEM:
-      return Object.assign({}, state, {...unset}, {tree: moveItem(state.tree, action.fromPath, action.toPath, action.placement, action.config)});
-
-
-    case constants.SET_DRAG_START:
-      return Object.assign({}, state, {...unset}, {dragStart: action.dragStart, dragging: action.dragging, mousePos: action.mousePos});
-
-    case constants.SET_DRAG_PROGRESS:
-      return Object.assign({}, state, {...unset}, {mousePos: action.mousePos, dragging: action.dragging});
-
-    case constants.SET_DRAG_END:
-      return Object.assign({}, state, {...unset}, {...emptyDrag, tree: checkEmptyGroups(state.tree, config)});
-
-
-    default:
-      return state;
-    }
+    
+    return {...state, ...unset, ...set};
   };
 
 };

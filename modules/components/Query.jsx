@@ -57,7 +57,7 @@ export default class Query extends PureComponent {
 
       const validatedTreeChanged = !immutableEqual(this.validatedTree, oldValidatedTree);
       if (validatedTreeChanged) {
-        onChange && onChange(this.validatedTree, newConfig);
+        onChange && onChange(this.validatedTree, newConfig, nextProps.__lastField);
       }
     }
 
